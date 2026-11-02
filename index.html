@@ -248,7 +248,7 @@ details summary::-webkit-details-marker{display:none}
         <div><label for="v-val">Valor total a receber (R$)</label><input id="v-val" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00"></div>
         <div><label for="v-dt">Data prevista de recebimento</label><input id="v-dt" type="date"></div>
       </div>
-      <div class="acts"><button class="sec" id="v-usar" type="button">Usar valor calculado</button><button class="main" id="v-salvar" type="button" style="min-height:46px;font-size:18px;width:auto;padding:0 18px">Salvar dados da venda</button></div>
+      <div class="acts"><button class="sec" id="v-nova" type="button">+ Nova venda</button><button class="sec" id="v-usar" type="button">Usar valor calculado</button><button class="main" id="v-salvar" type="button" style="min-height:46px;font-size:18px;width:auto;padding:0 18px">Salvar dados da venda</button></div>
       <p class="note" id="v-dif"></p>
     </div>
   </section>
@@ -1306,6 +1306,16 @@ window.addEventListener("error",e=>{const t=document.getElementById("toast");if(
     const proto=location.protocol;const arriscado=!ok||(proto!=="file:"&&proto!=="https:"&&proto!=="http:");
     stoOK=!arriscado;$("aviso-sto").hidden=!arriscado||!!db;
   }
+
+  // ---- Nova venda ----
+  $("v-nova").onclick=()=>{
+    ["lote","v-lotenum","v-cli","v-vend","v-faz","v-val","v-dt","placa","obs","pv"].forEach(id=>{if($(id))$(id).value="";});
+    $("cam").value="1";$("dt").value=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+    lsSet("pg_lote","");lsSet("pg_placa","");lsSet("pg_cam","1");filtroUser=false;
+    if($("venda").style.display==="none")setFold("venda",false);
+    renderAll();renderVenda(true);renderDocs(true);renderFotoBtn();
+    $("lote").focus();toast("Nova venda: preencha o nome da venda e os dados. As vendas anteriores continuam salvas.");
+  };
   // ---- Painel ----
   function showPage(p){
     const pain=p==="painel";
