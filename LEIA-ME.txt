@@ -1,0 +1,5 @@
+Pesagem do Gado - aplicativo instalável (PWA)
+
+Publique esta pasta inteira num endereço HTTPS (GitHub Pages, Netlify ou Cloudflare Pages).
+No iPhone: abra o endereço no Safari com internet > botão Compartilhar > "Adicionar à Tela de Início".
+Depois disso o app abre pelo ícone, sem internet, e guarda as pesagens no próprio celular.
