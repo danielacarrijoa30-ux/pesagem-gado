@@ -195,6 +195,13 @@ details summary::-webkit-details-marker{display:none}
 .aviso[hidden]{display:none}
 :root[data-theme="dark"] .aviso{background:#3A1E17;color:#F6D9CF}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .aviso{background:#3A1E17;color:#F6D9CF}}
+
+.tipos{grid-template-columns:repeat(3,1fr)!important}
+.balc .tipo{min-height:44px}
+.bres .pr .conv{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:2px}
+.bres .pr .conv:empty{display:none}
+.ajustes .ajkg{grid-column:auto;margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
+.ajustes .ajconv{align-self:center;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
 </style>
 </head><body>
 
@@ -223,7 +230,7 @@ details summary::-webkit-details-marker{display:none}
     <div class="card" id="aj">
       <p class="note" style="margin:0">Confira antes de começar a pesagem: rendimento de carcaça e preço da @ de cada tipo de animal.</p>
       <div class="ajustes" id="ajustes"></div>
-      <p class="note">Peso líquido = peso vivo × rendimento de carcaça. Arrobas = peso líquido ÷ 15. Valor = arrobas × preço da @.</p>
+      <p class="note">Peso líquido = peso vivo × rendimento de carcaça. Arrobas = peso líquido ÷ 15. Valor = arrobas × preço da @.<br><b>Bezerros e bezerras (venda por kg):</b> valor = peso vivo × preço do kg. Preço da @ convertido = preço do kg × 15 (ex.: R$ 17,00 × 15 = R$ 255,00 por @); arrobas = peso vivo ÷ 15.</p>
       <button class="sec" id="salvar-aj">Salvar ajustes</button>
     </div>
   </section>
@@ -265,9 +272,9 @@ details summary::-webkit-details-marker{display:none}
       <div class="tipos" id="tipos" role="group" aria-label="Tipo de animal"></div>
       <div class="peso"><label for="pv" class="sr">Peso vivo</label><input id="pv" type="text" inputmode="decimal" autocomplete="off" placeholder="Peso vivo"><span>kg</span></div>
       <div class="bres">
-        <div><div class="k">Peso líq.</div><div class="v" id="r-liq">0 kg</div></div>
-        <div class="pr"><label class="k" for="preco-in">Preço @ ✎</label><input id="preco-in" type="text" inputmode="decimal" autocomplete="off"></div>
-        <div class="hl"><div class="k">Arrobas</div><div class="v" id="r-arr">0,00 @</div></div>
+        <div><div class="k" id="k-liq">Peso líq.</div><div class="v" id="r-liq">0 kg</div></div>
+        <div class="pr"><label class="k" for="preco-in" id="k-preco">Preço @ ✎</label><input id="preco-in" type="text" inputmode="decimal" autocomplete="off"><div class="conv" id="r-conv"></div></div>
+        <div class="hl"><div class="k" id="k-arr">Arrobas</div><div class="v" id="r-arr">0,00 @</div></div>
         <div class="hl"><div class="k">Valor</div><div class="v" id="r-val">R$ 0,00</div></div>
       </div>
       <input id="obs" type="text" placeholder="Brinco / obs. (opcional)" aria-label="Brinco ou observação" class="obs">
@@ -785,7 +792,9 @@ window.addEventListener("error",e=>{const t=document.getElementById("toast");if(
     {id:"vaca",nome:"Vaca",rend:50,preco:255},
     {id:"boi52",nome:"Boi 52",rend:52,preco:255},
     {id:"boi53",nome:"Boi 53",rend:53,preco:255},
-    {id:"boi54",nome:"Boi 54",rend:54,preco:255}]};
+    {id:"boi54",nome:"Boi 54",rend:54,preco:255},
+    {id:"bezerro",nome:"Bezerro",modo:"kg",precoKg:17,rend:100,preco:255},
+    {id:"bezerra",nome:"Bezerra",modo:"kg",precoKg:17,rend:100,preco:255}]};
   let cfg = JSON.parse(JSON.stringify(DEF));
   let regs = [];           // {id, tipo, nome, pv, rend, preco, lote, cam, data, obs, ts}
   let tipoSel = "vaca";
@@ -806,12 +815,18 @@ window.addEventListener("error",e=>{const t=document.getElementById("toast");if(
   $("cam").value = lsGet("pg_cam")||"1";
   $("placa").value = lsGet("pg_placa")||"";
 
+  function normTipos(){
+    DEF.tipos.forEach(d=>{if(!cfg.tipos.some(t=>t.id===d.id))cfg.tipos.push(JSON.parse(JSON.stringify(d)));});
+    cfg.tipos.forEach(t=>{if(t.modo==="kg"){t.precoKg=Number(t.precoKg)||0;t.rend=100;t.preco=Math.round(t.precoKg*15*100)/100;}});
+  }
+  const ehKg=t=>t&&t.modo==="kg";
   function renderTipos(){
+    normTipos();
     $("tipos").innerHTML="";
     cfg.tipos.forEach(t=>{
       const b=document.createElement("button");b.className="tipo";b.type="button";
       b.setAttribute("aria-pressed",t.id===tipoSel);
-      b.innerHTML=`${t.nome.replace(/^Boi /,"Boi ")}<small>${nf(t.rend,t.rend%1?1:0)}%</small>`;
+      b.innerHTML=ehKg(t)?`${t.nome}<small>por kg</small>`:`${t.nome}<small>${nf(t.rend,t.rend%1?1:0)}%</small>`;
       b.onclick=()=>{tipoSel=t.id;renderTipos();renderCalc();};
       $("tipos").appendChild(b);
     });
@@ -819,7 +834,12 @@ window.addEventListener("error",e=>{const t=document.getElementById("toast");if(
   function renderCalc(){
     const t=tipo(tipoSel), pv=num($("pv").value)||0, r=calc(pv,t.rend,t.preco);
     $("r-liq").textContent=nf(r.liq,1)+" kg";
-    if(document.activeElement!==$("preco-in"))$("preco-in").value=t.preco;
+    const kg=ehKg(t);
+    $("k-liq").textContent=kg?"Peso (venda por kg)":"Peso líq.";
+    $("k-preco").textContent=kg?"Preço do kg ✎":"Preço @ ✎";
+    $("k-arr").textContent=kg?"Arrobas (peso vivo)":"Arrobas";
+    if(document.activeElement!==$("preco-in"))$("preco-in").value=kg?nf(t.precoKg,2):t.preco;
+    $("r-conv").textContent=kg?`= ${brl(t.precoKg*15)} por @`:"";
     $("r-arr").textContent=nf(r.arr,2)+" @";
     $("r-val").textContent=brl(r.val);
   }
@@ -828,19 +848,27 @@ window.addEventListener("error",e=>{const t=document.getElementById("toast");if(
     if(db){try{await db.doc("config/geral").set({tipos:cfg.tipos});if(msg)toast(msg);}catch(e){toast("Não foi possível salvar o preço agora. Confira o sinal de internet.")}}
     else{lsSet("pg_cfg",JSON.stringify(cfg));if(msg)toast(msg);}
   }
-  $("preco-in").addEventListener("input",()=>{const v=num($("preco-in").value);if(v>=0){tipo(tipoSel).preco=v;renderCalc();}});
-  $("preco-in").addEventListener("change",()=>{const t=tipo(tipoSel);renderAjustes();salvarCfg(`Preço da @ do ${t.nome}: ${brl(t.preco)}. Para aplicar nas pesagens já feitas, use Recalcular no Resumo do lote.`);renderRecalc();});
+  $("preco-in").addEventListener("input",()=>{const v=num($("preco-in").value);if(v>=0){const t=tipo(tipoSel);if(ehKg(t)){t.precoKg=v;t.preco=Math.round(v*15*100)/100;}else t.preco=v;renderCalc();}});
+  $("preco-in").addEventListener("change",()=>{const t=tipo(tipoSel);renderAjustes();salvarCfg(`${ehKg(t)?"Preço do kg do "+t.nome+": "+brl(t.precoKg)+" (= "+brl(t.preco)+" por @)":"Preço da @ do "+t.nome+": "+brl(t.preco)}. Para aplicar nas pesagens já feitas, use Recalcular no Resumo do lote.`);renderRecalc();});
 
   function renderAjustes(){
+    normTipos();
     const g=$("ajustes");g.innerHTML='<span class="h">Tipo</span><span class="h">Rendimento %</span><span class="h">Preço da @ (R$)</span>';
-    cfg.tipos.forEach(t=>{
+    cfg.tipos.filter(t=>!ehKg(t)).forEach(t=>{
       g.insertAdjacentHTML("beforeend",`<span class="nm">${t.nome}</span>
         <input id="aj-r-${t.id}" type="text" inputmode="decimal" autocomplete="off" value="${String(t.rend).replace(".",",")}" aria-label="Rendimento ${t.nome}">
         <input id="aj-p-${t.id}" type="text" inputmode="decimal" autocomplete="off" value="${nf(t.preco,2)}" aria-label="Preço da arroba ${t.nome}">`);
     });
+    g.insertAdjacentHTML("beforeend",'<span class="h ajkg">Venda por kg</span><span class="h ajkg">Preço do kg (R$)</span><span class="h ajkg">Convertido p/ @</span>');
+    cfg.tipos.filter(ehKg).forEach(t=>{
+      g.insertAdjacentHTML("beforeend",`<span class="nm">${t.nome}</span>
+        <input id="aj-p-${t.id}" type="text" inputmode="decimal" autocomplete="off" value="${nf(t.precoKg,2)}" aria-label="Preço do kg ${t.nome}" data-kg="${t.id}">
+        <span class="ajconv" id="aj-c-${t.id}">${brl(t.precoKg*15)} / @</span>`);
+    });
+    g.querySelectorAll("[data-kg]").forEach(i=>i.addEventListener("input",()=>{const v=num(i.value);$("aj-c-"+i.dataset.kg).textContent=isFinite(v)?brl(v*15)+" / @":"—";}));
   }
   $("salvar-aj").onclick=async()=>{
-    cfg.tipos.forEach(t=>{t.rend=num($("aj-r-"+t.id).value)||t.rend;t.preco=num($("aj-p-"+t.id).value)||0;});
+    cfg.tipos.forEach(t=>{if(ehKg(t)){t.precoKg=num($("aj-p-"+t.id).value)||0;}else{t.rend=num($("aj-r-"+t.id).value)||t.rend;t.preco=num($("aj-p-"+t.id).value)||0;}});normTipos();renderAjustes();
     renderTipos();renderCalc();renderRecalc();refreshFold();
     if(db){try{await db.doc("config/geral").set({tipos:cfg.tipos});toast("Ajustes salvos.");}catch(e){toast("Não foi possível salvar os ajustes agora. Confira o sinal de internet.")}}
     else{lsSet("pg_cfg",JSON.stringify(cfg));toast("Ajustes salvos neste celular.");}
@@ -922,7 +950,7 @@ window.addEventListener("error",e=>{const t=document.getElementById("toast");if(
     const lote=$("lote").value.trim(), cam=$("cam").value;
     const placa=$("placa").value.trim().toUpperCase().replace(/\s+/g,"");
     lsSet("pg_lote",lote);lsSet("pg_cam",cam);lsSet("pg_placa",placa);
-    const r={tipo:t.id,nome:t.nome,pv,rend:t.rend,preco:t.preco,lote,cam:cam?Number(cam):null,placa,num:nCam(lote,cam)+1,data:$("dt").value,obs:$("obs").value.trim(),ts:Date.now()};
+    const r={tipo:t.id,nome:t.nome,pv,rend:t.rend,preco:t.preco,modo:t.modo||"arroba",precoKg:ehKg(t)?t.precoKg:null,lote,cam:cam?Number(cam):null,placa,num:nCam(lote,cam)+1,data:$("dt").value,obs:$("obs").value.trim(),ts:Date.now()};
     const c=calc(pv,t.rend,t.preco);
     $("salvar").disabled=true;
     {r.id="l"+r.ts;regs.push(r);saveLocal();renderAll();}
@@ -1024,14 +1052,14 @@ window.addEventListener("error",e=>{const t=document.getElementById("toast");if(
     const p=pendRecalc(), f=$("filtro").value, alvo=f==="__todos"?"todos os lotes":f;
     $("recalc").disabled=!p.length; $("recalc").classList.toggle("warn",recalcArm);
     $("recalc").textContent=recalcArm?`Confirmar: recalcular ${p.length} pesagem(ns)`:"Recalcular com o preço atual da @";
-    $("recalc-info").textContent=p.length?`${p.length} pesagem(ns) de ${alvo} usam preço diferente do atual (${cfg.tipos.map(t=>t.nome+" "+brl(t.preco)).join(" · ")}).`:`Todas as pesagens de ${alvo} já estão no preço atual.`;
+    $("recalc-info").textContent=p.length?`${p.length} pesagem(ns) de ${alvo} usam preço diferente do atual (${cfg.tipos.map(t=>t.nome+" "+(ehKg(t)?brl(t.precoKg)+"/kg":brl(t.preco))).join(" · ")}).`:`Todas as pesagens de ${alvo} já estão no preço atual.`;
   }
   $("recalc").onclick=async()=>{
     if(!recalcArm){recalcArm=true;renderRecalc();setTimeout(()=>{if(recalcArm){recalcArm=false;renderRecalc();}},6000);return;}
     recalcArm=false;const p=pendRecalc();let ok=0;
     for(const r of p){const t=cfg.tipos.find(x=>x.id===r.tipo);
-      if(db){try{await db.doc("pesagens/"+r.id).update({preco:t.preco});ok++;}catch(e){}}
-      else{r.preco=t.preco;ok++;}}
+      if(db){try{await db.doc("pesagens/"+r.id).update({preco:t.preco,precoKg:ehKg(t)?t.precoKg:null});ok++;}catch(e){}}
+      else{r.preco=t.preco;if(ehKg(t))r.precoKg=t.precoKg;ok++;}}
     if(!db){saveLocal();renderAll();}
     toast(ok===p.length?`${ok} pesagem(ns) recalculada(s). Se quiser, atualize o valor a receber em Dados da venda / lote.`:`Recalculadas ${ok} de ${p.length}. Confira o sinal de internet e tente de novo.`);
     renderRecalc();
@@ -1056,7 +1084,7 @@ window.addEventListener("error",e=>{const t=document.getElementById("toast");if(
   function foldResumo(id){
     const e=x=>String(x).replace(/</g,"&lt;");
     if(id==="regs"){const rs=filtrados().slice().sort((x,y)=>y.ts-x.ts);if(!rs.length)return "Nenhuma pesagem neste lote.";const u=rs[0];return `<b>${rs.length} pesagem(ns)</b> · última: ${e(u.nome)} ${nf(u.pv)} kg${u.cam?" · caminhão "+u.cam+(u.num?", animal "+u.num:""):""}. Toque para ver a lista.`;}
-    if(id==="aj")return cfg.tipos.map(t=>`<b>${e(t.nome)}</b> ${nf(t.rend,t.rend%1?1:0)}% · ${brl(t.preco)}`).join(" &nbsp;|&nbsp; ");
+    if(id==="aj")return cfg.tipos.map(t=>ehKg(t)?`<b>${e(t.nome)}</b> ${brl(t.precoKg)}/kg (= ${brl(t.preco)}/@)`:`<b>${e(t.nome)}</b> ${nf(t.rend,t.rend%1?1:0)}% · ${brl(t.preco)}`).join(" &nbsp;|&nbsp; ");
     const l=loteForm(),v=vendaDe(l);
     if(!l)return "Nenhum lote informado. Toque para abrir e preencher.";
     return `<b>${e(l)}</b>${v.loteNum?" · "+e(v.loteNum):""}${v.cliente?" · "+e(v.cliente):""}${v.fazenda?" · "+e(v.fazenda):""}${v.receber!=null?" · a receber "+brl(v.receber):""}${v.dataRec?" em "+fmtD(v.dataRec):""}`;
@@ -1147,7 +1175,7 @@ window.addEventListener("error",e=>{const t=document.getElementById("toast");if(
       // animais
       const T={cab:0,pv:0,liq:0,arr:0,val:0};
       const body=rs.map((r,i)=>{const cc=calc(r.pv,r.rend,r.preco);T.cab++;T.pv+=r.pv;T.liq+=cc.liq;T.arr+=cc.arr;T.val+=cc.val;
-        return [i+1,r.cam||"",r.num||"",fmtD(r.data),r.nome,nf(r.pv,1),nf(r.rend,r.rend%1?1:0)+"%",nf(cc.liq,1),nf(cc.arr,2),nf(r.preco,2),nf(cc.val,2)];});
+        return [i+1,r.cam||"",r.num||"",fmtD(r.data),r.nome,nf(r.pv,1),r.modo==="kg"?"por kg":nf(r.rend,r.rend%1?1:0)+"%",nf(cc.liq,1),nf(cc.arr,2),r.modo==="kg"?nf(r.precoKg,2)+"/kg":nf(r.preco,2),nf(cc.val,2)];});
       doc.autoTable(Object.assign({},opt,{startY:y,head:[["Nº","Cam.","Animal","Data","Tipo","Peso vivo (kg)","Rend.","Peso líq. (kg)","Arrobas","Preço @","Valor (R$)"]],body,
         foot:[["Total","","",T.cab+" cab","",nf(T.pv,1),"",nf(T.liq,1),nf(T.arr,2),"",nf(T.val,2)]],
         didParseCell:d=>{if(d.section==="foot"&&[5,7,8,10].includes(d.column.index))d.cell.styles.halign="right";},columnStyles:{0:{halign:"right"},1:{halign:"center"},2:{halign:"center"},5:{halign:"right"},6:{halign:"right"},7:{halign:"right"},8:{halign:"right"},9:{halign:"right"},10:{halign:"right"}}}));
